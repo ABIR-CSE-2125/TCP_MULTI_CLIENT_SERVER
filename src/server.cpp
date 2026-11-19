@@ -1,3 +1,5 @@
+#include "communication.hpp"
+
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <iostream>
@@ -69,15 +71,18 @@ int main()
         close(socket_fd);
         return 1;
     }
-        std::cout << "Accepted a connection from "
-                  << inet_ntoa(client_address.sin_addr) << ":"
-                  << ntohs(client_address.sin_port) << "\n";
+    std::cout << "Accepted a connection from "
+              << inet_ntoa(client_address.sin_addr) << ":"
+              << ntohs(client_address.sin_port) << "\n";
 
     while (true)
     {
         // READ BLOCK
         char buffer[1024] ;
-        ssize_t bytes_received = recv(client_socket_fd, buffer, sizeof(buffer), 0);
+        ssize_t bytes_received = receive_data(
+            client_socket_fd,
+            buffer,
+            sizeof(buffer));
         if (bytes_received < 0)
         {
             perror("Receive failed");
@@ -92,31 +97,15 @@ int main()
         std::cout.write(buffer, bytes_received);
         std::cout << '\n';
         // SEND BLOCK
-        size_t total_bytes_sent = 0;
-        // size_t send_window = 24;
-        while (total_bytes_sent < static_cast<size_t>(bytes_received))
-        {
-            ssize_t bytes_sent = send(client_socket_fd,
-                                      buffer + total_bytes_sent,
-                                      static_cast<size_t>(bytes_received) - total_bytes_sent,
-                                    MSG_NOSIGNAL);
-            if (bytes_sent < 0)
-            {
-                perror("Send failed");
-                break;
-            }
-            else if (bytes_sent == 0)
-            {
-                std::cerr << "Send made no progress\n";
-                break;
-            }
-            total_bytes_sent += static_cast<size_t>(bytes_sent);
-            std::cout << "Sent: " << bytes_sent << " bytes\n";
-        }
-        if (total_bytes_sent < static_cast<size_t>(bytes_received))
+        if (!send_all(
+                client_socket_fd,
+                buffer,
+                static_cast<std::size_t>(bytes_received)))
         {
             break;
         }
+
+        std::cout << "Echo sent successfully\n";
     }
 
     close(client_socket_fd);
