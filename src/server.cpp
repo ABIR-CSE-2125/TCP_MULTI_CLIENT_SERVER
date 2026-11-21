@@ -25,11 +25,6 @@ int main()
     server_address.sin_port = htons(8080);                                     // NETWORK BYTE ORDER FOR PORT 8080 (BIG ENDIAN)
     int ip_status = inet_pton(AF_INET, "127.0.0.1", &server_address.sin_addr); // CONVERT IP ADDRESS FROM TEXT TO BINARY FORM
 
-    /*{
-    ip_status --> 1 : The conversion was successful, and the IP address is valid.
-    ip_status --> 0 : The input string is not a valid IP address.
-    ip_status --> -1 : An System error occurred during the conversion
-    }*/
     if (ip_status < 0)
     {
         perror("Invalid address or address not supported");
@@ -59,56 +54,56 @@ int main()
     }
     std::cout << "Server is listening on 127.0.0.1:8080\n";
 
-    // getchar(); // WAIT FOR USER INPUT TO CLOSE THE SERVER
-
-    // Accepting a connection (optional, for demonstration purposes)
-    sockaddr_in client_address{};
-    socklen_t client_address_len = sizeof(client_address);
-    int client_socket_fd = accept(socket_fd, (struct sockaddr *)&client_address, &client_address_len);
-    if (client_socket_fd < 0)
+    while (true) //  For  keep Searching for connections
     {
-        perror("Accept failed");
-        close(socket_fd);
-        return 1;
-    }
-    std::cout << "Accepted a connection from "
-              << inet_ntoa(client_address.sin_addr) << ":"
-              << ntohs(client_address.sin_port) << "\n";
+        // Accepting a connection (optional, for demonstration purposes)
+        sockaddr_in client_address{};
+        socklen_t client_address_len = sizeof(client_address);
+        int client_socket_fd = accept(socket_fd, (struct sockaddr *)&client_address, &client_address_len);
+        if (client_socket_fd < 0)
+        {
+            perror("Accept failed");
+            continue;
+        }
+        std::cout << "Accepted a connection from "
+                  << inet_ntoa(client_address.sin_addr) << ":"
+                  << ntohs(client_address.sin_port) << "\n";
 
-    while (true)
-    {
-        // READ BLOCK
-        char buffer[1024] ;
-        ssize_t bytes_received = receive_data(
-            client_socket_fd,
-            buffer,
-            sizeof(buffer));
-        if (bytes_received < 0)
+        while (true)
         {
-            perror("Receive failed");
-            break;
-        }
-        else if (bytes_received == 0)
-        {
-            std::cout << "Client disconnected\n";
-            break;
-        }
-        std::cout << "Received: " << bytes_received << " bytes\n" << "Content: ";
-        std::cout.write(buffer, bytes_received);
-        std::cout << '\n';
-        // SEND BLOCK
-        if (!send_all(
+            // READ BLOCK
+            char buffer[1024];
+            ssize_t bytes_received = receive_data(
                 client_socket_fd,
                 buffer,
-                static_cast<std::size_t>(bytes_received)))
-        {
-            break;
+                sizeof(buffer));
+            if (bytes_received < 0)
+            {
+                perror("Receive failed");
+                break;
+            }
+            else if (bytes_received == 0)
+            {
+                std::cout << "Client disconnected\n";
+                break;
+            }
+            std::cout << "Received: " << bytes_received << " bytes\n"
+                      << "Content: ";
+            std::cout.write(buffer, bytes_received);
+            std::cout << '\n';
+            // SEND BLOCK
+            if (!send_all(
+                    client_socket_fd,
+                    buffer,
+                    static_cast<std::size_t>(bytes_received)))
+            {
+                break;
+            }
+
+            std::cout << "Echo sent successfully\n";
         }
-
-        std::cout << "Echo sent successfully\n";
+        close(client_socket_fd);
     }
-
-    close(client_socket_fd);
     close(socket_fd);
     return 0;
 }
