@@ -1,5 +1,6 @@
 #include "communication.hpp"
-
+#include "config.hpp"
+//=======================================================
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <iostream>
@@ -7,9 +8,18 @@
 #include <arpa/inet.h>
 #include <cstdio>
 #include <sys/types.h>
+#include <vector>
 
 int main()
 {
+
+    ServerConfig config;
+
+    if (!load_config("config/server.conf", config))
+    {
+        std::cerr << "Failed to load server configuration. Exiting.\n";
+        return 1;
+    }
 
     int socket_fd = create_socket();
 
@@ -17,14 +27,14 @@ int main()
         return 1;
 
     // BIND SOCKET
-    if (!bind_socket(socket_fd, "127.0.0.1", 8080))
+    if (!bind_socket(socket_fd, config.server_ip, config.server_port))
     {
         close(socket_fd);
         return 1;
     }
 
     // START LISTENING
-    if (!start_listening(socket_fd, 5))
+    if (!start_listening(socket_fd, config.listen_backlog))
     {
         close(socket_fd);
         return 1;
@@ -38,7 +48,7 @@ int main()
         int client_socket_fd = accept_client(
             socket_fd,
             client_address);
-            
+
         std::cout << "Accepted a connection from "
                   << inet_ntoa(client_address.sin_addr) << ":"
                   << ntohs(client_address.sin_port) << "\n";
@@ -46,11 +56,11 @@ int main()
         while (true)
         {
             // READ BLOCK
-            char buffer[1024];
+            std::vector<char> buffer(config.buffer_size);
             ssize_t bytes_received = receive_data(
                 client_socket_fd,
-                buffer,
-                sizeof(buffer));
+                buffer.data(),
+                buffer.size());
             if (bytes_received < 0)
             {
                 perror("Receive failed");
@@ -63,12 +73,12 @@ int main()
             }
             std::cout << "Received: " << bytes_received << " bytes\n"
                       << "Content: ";
-            std::cout.write(buffer, bytes_received);
+            std::cout.write(buffer.data(), bytes_received);
             std::cout << '\n';
             // SEND BLOCK
             if (!send_all(
                     client_socket_fd,
-                    buffer,
+                    buffer.data(),
                     static_cast<std::size_t>(bytes_received)))
             {
                 break;
