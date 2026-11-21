@@ -10,61 +10,35 @@
 
 int main()
 {
-    // CREATE A SOCKET
-    int socket_fd = socket(AF_INET, SOCK_STREAM, 0);
+
+    int socket_fd = create_socket();
+
     if (socket_fd < 0)
-    {
-        perror("Socket creation failed");
         return 1;
-    }
-    std::cout << "Socket created successfully!\n";
 
-    // BIND THE SOCKET TO AN IP ADDRESS AND PORT
-    sockaddr_in server_address{};
-    server_address.sin_family = AF_INET;                                       // FOR IPV4
-    server_address.sin_port = htons(8080);                                     // NETWORK BYTE ORDER FOR PORT 8080 (BIG ENDIAN)
-    int ip_status = inet_pton(AF_INET, "127.0.0.1", &server_address.sin_addr); // CONVERT IP ADDRESS FROM TEXT TO BINARY FORM
+    // BIND SOCKET
+    if (!bind_socket(socket_fd, "127.0.0.1", 8080))
+    {
+        close(socket_fd);
+        return 1;
+    }
 
-    if (ip_status < 0)
+    // START LISTENING
+    if (!start_listening(socket_fd, 5))
     {
-        perror("Invalid address or address not supported");
         close(socket_fd);
         return 1;
     }
-    else if (ip_status == 0)
-    {
-        std::cerr << "Invalid IP address format\n";
-        close(socket_fd);
-        return 1;
-    }
-    if (bind(socket_fd, (struct sockaddr *)&server_address, sizeof(server_address)) < 0)
-    {
-        perror("Bind failed");
-        close(socket_fd);
-        return 1;
-    }
-    std::cout << "Socket bound to 127.0.0.1:8080\n";
-
-    // LISTEN FOR INCOMING CONNECTIONS
-    if (listen(socket_fd, 5) < 0)
-    {
-        perror("Listen failed");
-        close(socket_fd);
-        return 1;
-    }
-    std::cout << "Server is listening on 127.0.0.1:8080\n";
 
     while (true) //  For  keep Searching for connections
     {
         // Accepting a connection (optional, for demonstration purposes)
         sockaddr_in client_address{};
-        socklen_t client_address_len = sizeof(client_address);
-        int client_socket_fd = accept(socket_fd, (struct sockaddr *)&client_address, &client_address_len);
-        if (client_socket_fd < 0)
-        {
-            perror("Accept failed");
-            continue;
-        }
+
+        int client_socket_fd = accept_client(
+            socket_fd,
+            client_address);
+            
         std::cout << "Accepted a connection from "
                   << inet_ntoa(client_address.sin_addr) << ":"
                   << ntohs(client_address.sin_port) << "\n";

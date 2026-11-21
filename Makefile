@@ -3,7 +3,7 @@ CXXFLAGS = -std=c++17 -Wall -Wextra -Wpedantic -Iinclude
 
 TARGET = build/tcp_server.exe
 
-SOURCES = src/server.cpp src/communication.cpp
+SOURCES = src/server.cpp src/communication.cpp src/config.cpp
 OBJECTS = $(patsubst src/%.cpp,build/%.o,$(SOURCES))
 DEPS = $(OBJECTS:.o=.d)
 
