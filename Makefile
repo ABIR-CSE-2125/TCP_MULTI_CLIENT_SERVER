@@ -1,5 +1,5 @@
 CXX = g++
-CXXFLAGS = -std=c++17 -Wall -Wextra -Wpedantic -Iinclude
+CXXFLAGS = -std=c++17 -Wall -Wextra -Wpedantic -pthread -Iinclude
 
 TARGET = build/tcp_server.exe
 

@@ -5,6 +5,11 @@
 #include <iostream>
 #include <unistd.h>
 #include <arpa/inet.h>
+//=======================================================
+#include <thread>
+#include <functional>
+#include <system_error>
+#include <exception>
 
 int main()
 {
@@ -45,11 +50,41 @@ int main()
             socket_fd,
             client_address);
 
-        std::cout << "Accepted a connection from "
-                  << inet_ntoa(client_address.sin_addr) << ":"
-                  << ntohs(client_address.sin_port) << "\n";
+            if (client_socket_fd < 0){
+                
+                std::cerr << "Failed to accept client connection. Continuing...\n";
+                continue; // Continue to the next iteration to accept another connection
+            }
 
-            handle_client(client_socket_fd, config);
+        // Handle the client in a separate thread
+            try
+            {
+                std::thread client_thread(
+                    handle_client,
+                    client_socket_fd,
+                    std::cref(config));
+
+                try
+                {
+                    client_thread.detach();
+                }
+                catch (const std::system_error &e)
+                {
+                    std::cerr << "Thread detach failed: "
+                              << e.what() << '\n';
+
+                    if (client_thread.joinable())
+                    {
+                        client_thread.join();
+                    }
+                }
+            }
+            catch (const std::system_error &e)
+            {
+                std::cerr << "Thread creation failed: "
+                          << e.what() << '\n';
+                close(client_socket_fd);
+            }
     }
     close(socket_fd);
     return 0;
