@@ -2,13 +2,14 @@
 #include "config.hpp"
 //=======================================================
 #include <netinet/in.h>
-#include <sys/socket.h>
 #include <iostream>
 #include <unistd.h>
 #include <arpa/inet.h>
-#include <cstdio>
-#include <sys/types.h>
-#include <vector>
+//=======================================================
+#include <thread>
+#include <functional>
+#include <system_error>
+#include <exception>
 
 int main()
 {
@@ -49,44 +50,41 @@ int main()
             socket_fd,
             client_address);
 
-        std::cout << "Accepted a connection from "
-                  << inet_ntoa(client_address.sin_addr) << ":"
-                  << ntohs(client_address.sin_port) << "\n";
+            if (client_socket_fd < 0){
+                
+                std::cerr << "Failed to accept client connection. Continuing...\n";
+                continue; // Continue to the next iteration to accept another connection
+            }
 
-        while (true)
-        {
-            // READ BLOCK
-            std::vector<char> buffer(config.buffer_size);
-            ssize_t bytes_received = receive_data(
-                client_socket_fd,
-                buffer.data(),
-                buffer.size());
-            if (bytes_received < 0)
+        // Handle the client in a separate thread
+            try
             {
-                perror("Receive failed");
-                break;
-            }
-            else if (bytes_received == 0)
-            {
-                std::cout << "Client disconnected\n";
-                break;
-            }
-            std::cout << "Received: " << bytes_received << " bytes\n"
-                      << "Content: ";
-            std::cout.write(buffer.data(), bytes_received);
-            std::cout << '\n';
-            // SEND BLOCK
-            if (!send_all(
+                std::thread client_thread(
+                    handle_client,
                     client_socket_fd,
-                    buffer.data(),
-                    static_cast<std::size_t>(bytes_received)))
-            {
-                break;
-            }
+                    std::cref(config));
 
-            std::cout << "Echo sent successfully\n";
-        }
-        close(client_socket_fd);
+                try
+                {
+                    client_thread.detach();
+                }
+                catch (const std::system_error &e)
+                {
+                    std::cerr << "Thread detach failed: "
+                              << e.what() << '\n';
+
+                    if (client_thread.joinable())
+                    {
+                        client_thread.join();
+                    }
+                }
+            }
+            catch (const std::system_error &e)
+            {
+                std::cerr << "Thread creation failed: "
+                          << e.what() << '\n';
+                close(client_socket_fd);
+            }
     }
     close(socket_fd);
     return 0;
