@@ -2,7 +2,6 @@
 #include "config.hpp"
 //=======================================================
 #include <netinet/in.h>
-#include <sys/socket.h>
 #include <iostream>
 #include <unistd.h>
 #include <arpa/inet.h>
