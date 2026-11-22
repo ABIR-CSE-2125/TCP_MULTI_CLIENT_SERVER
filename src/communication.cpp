@@ -1,4 +1,6 @@
 #include "communication.hpp"
+#include "config.hpp"
+
 #include <cstdio>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -6,6 +8,7 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <sys/types.h>
+#include <vector>
 
 int create_socket()
 {
@@ -22,9 +25,7 @@ int create_socket()
 }
 
 // BIND SOCKET TO AN IP ADDRESS AND PORT
-bool bind_socket(int socket_fd,
-                 const std::string &ip_address,
-                 int port)
+bool bind_socket(int socket_fd,const std::string &ip_address, int port)
 {
     sockaddr_in server_address{};
 
@@ -76,8 +77,7 @@ bool start_listening(int socket_fd, int backlog)
 }
 
 // ACCEPT AN INCOMING CLIENT
-int accept_client(int server_socket_fd,
-                  sockaddr_in &client_address)
+int accept_client(int server_socket_fd, sockaddr_in &client_address)
 {
     socklen_t client_address_len = sizeof(client_address);
 
@@ -131,4 +131,43 @@ bool send_all(int socket_fd, const char *data, std::size_t data_size){
         total_bytes_sent += static_cast<std::size_t>(bytes_sent);
     }
     return true;
+}
+
+void handle_client(int client_socket_fd, const ServerConfig &config)
+{
+    std::vector<char> buffer(config.buffer_size);
+    while(true){
+
+    // Receive data from the client
+    ssize_t bytes_received = receive_data(
+        client_socket_fd,
+        buffer.data(),
+        buffer.size());
+    if (bytes_received < 0)
+    {
+        perror("Receive failed");
+        break;
+    }
+    else if (bytes_received == 0)
+    {
+        std::cout << "Client disconnected\n";
+        break;
+    }
+    std::cout << "Received: " << bytes_received << " bytes\n"
+              << "Content: ";
+    std::cout.write(buffer.data(), bytes_received);
+    std::cout << '\n';
+    // Send the received data back to the client (echo)
+    if (!send_all(
+            client_socket_fd,
+            buffer.data(),
+            static_cast<std::size_t>(bytes_received)))
+    {
+        break;
+    }
+
+    std::cout << "Echo sent successfully\n";
+}
+    // Close the client socket after handling
+    close(client_socket_fd);
 }

@@ -5,9 +5,6 @@
 #include <iostream>
 #include <unistd.h>
 #include <arpa/inet.h>
-#include <cstdio>
-#include <sys/types.h>
-#include <vector>
 
 int main()
 {
@@ -52,40 +49,7 @@ int main()
                   << inet_ntoa(client_address.sin_addr) << ":"
                   << ntohs(client_address.sin_port) << "\n";
 
-        while (true)
-        {
-            // READ BLOCK
-            std::vector<char> buffer(config.buffer_size);
-            ssize_t bytes_received = receive_data(
-                client_socket_fd,
-                buffer.data(),
-                buffer.size());
-            if (bytes_received < 0)
-            {
-                perror("Receive failed");
-                break;
-            }
-            else if (bytes_received == 0)
-            {
-                std::cout << "Client disconnected\n";
-                break;
-            }
-            std::cout << "Received: " << bytes_received << " bytes\n"
-                      << "Content: ";
-            std::cout.write(buffer.data(), bytes_received);
-            std::cout << '\n';
-            // SEND BLOCK
-            if (!send_all(
-                    client_socket_fd,
-                    buffer.data(),
-                    static_cast<std::size_t>(bytes_received)))
-            {
-                break;
-            }
-
-            std::cout << "Echo sent successfully\n";
-        }
-        close(client_socket_fd);
+            handle_client(client_socket_fd, config);
     }
     close(socket_fd);
     return 0;
