@@ -5,7 +5,6 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <iostream>
-#include <unistd.h>
 #include <arpa/inet.h>
 #include <sys/types.h>
 #include <vector>
@@ -26,7 +25,7 @@ int create_socket()
 }
 
 // BIND SOCKET TO AN IP ADDRESS AND PORT
-bool bind_socket(int socket_fd,const std::string &ip_address, int port)
+bool bind_socket(int socket_fd, const std::string &ip_address, int port)
 {
     sockaddr_in server_address{};
 
@@ -111,8 +110,9 @@ ssize_t receive_data(int socket_fd, char *buffer, std::size_t buffer_size)
     return recv(socket_fd, buffer, buffer_size, 0);
 }
 
-bool send_all(int socket_fd, const char *data, std::size_t data_size){
-    
+bool send_all(int socket_fd, const char *data, std::size_t data_size)
+{
+
     std::size_t total_bytes_sent = 0;
     while (total_bytes_sent < data_size)
     {
@@ -141,38 +141,39 @@ bool send_all(int socket_fd, const char *data, std::size_t data_size){
 void handle_client(int client_socket_fd, const ServerConfig &config)
 {
     std::vector<char> buffer(config.buffer_size);
-    while(true){
+    while (true)
+    {
 
-    // Receive data from the client
-    ssize_t bytes_received = receive_data(
-        client_socket_fd,
-        buffer.data(),
-        buffer.size());
-    if (bytes_received < 0)
-    {
-        perror("Receive failed");
-        break;
-    }
-    else if (bytes_received == 0)
-    {
-        std::cout << "Client disconnected\n";
-        break;
-    }
-    std::cout << "Received: " << bytes_received << " bytes\n"
-              << "Content: ";
-    std::cout.write(buffer.data(), bytes_received);
-    std::cout << '\n';
-    // Send the received data back to the client (echo)
-    if (!send_all(
+        // Receive data from the client
+        ssize_t bytes_received = receive_data(
             client_socket_fd,
             buffer.data(),
-            static_cast<std::size_t>(bytes_received)))
-    {
-        break;
-    }
+            buffer.size());
+        if (bytes_received < 0)
+        {
+            perror("Receive failed");
+            break;
+        }
+        else if (bytes_received == 0)
+        {
+            std::cout << "Client disconnected\n";
+            std::cout << "DEBUG: handle_client returning for FD: "
+                      << client_socket_fd << std::endl;
+            break;
+        }
+        std::cout << "Received: " << bytes_received << " bytes\n"
+                  << "Content: ";
+        std::cout.write(buffer.data(), bytes_received);
+        std::cout << '\n';
+        // Send the received data back to the client (echo)
+        if (!send_all(
+                client_socket_fd,
+                buffer.data(),
+                static_cast<std::size_t>(bytes_received)))
+        {
+            break;
+        }
 
-    std::cout << "Echo sent successfully\n";
-}
-    // Close the client socket after handling
-    close(client_socket_fd);
+        std::cout << "Echo sent successfully\n";
+    }
 }

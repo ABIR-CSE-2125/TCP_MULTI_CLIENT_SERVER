@@ -2,6 +2,7 @@
 #define THREAD_POOL_HPP
 
 #include <vector>
+#include <unordered_set>
 #include <thread>
 #include <queue>
 #include <mutex>
@@ -15,6 +16,7 @@ class ThreadPool
     private:
         std::vector<std::thread> workers;
         std::queue<int> client_queue;
+        std::unordered_set<int> active_clients;
         std::mutex queue_mutex;
         std::condition_variable condition;
         bool stopping = false;
