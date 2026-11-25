@@ -23,7 +23,8 @@ class ThreadPool
     public:
         ThreadPool(std::size_t num_threads, const ServerConfig &config_param);
         ~ThreadPool();
-        void enqueue_client(int client_socket_fd);
+        bool enqueue_client(int client_socket_fd);
+        void shutdown();
 };
 
 #endif

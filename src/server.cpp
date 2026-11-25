@@ -5,8 +5,16 @@
 #include <netinet/in.h>
 #include <iostream>
 #include <unistd.h>
+#include <csignal>
+#include <cerrno>
+#include <signal.h>
 
+volatile std::sig_atomic_t shutdown_requested = 0;
 
+void handle_shutdown_signal(int signal)
+{
+    shutdown_requested = 1;
+}
 
 int main()
 {
@@ -38,9 +46,17 @@ int main()
         return 1;
     }
 
-    ThreadPool thread_pool(4, config);
+    struct sigaction sa{};
+    sa.sa_handler = handle_shutdown_signal;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
 
-    while (true) //  For  keep Searching for connections
+    sigaction(SIGINT, &sa, nullptr);
+    sigaction(SIGTERM, &sa, nullptr);
+
+    ThreadPool thread_pool(2, config);
+
+    while (!shutdown_requested) //  For  keep Searching for connections
     {
         // Accepting a connection (optional, for demonstration purposes)
         sockaddr_in client_address{};
@@ -50,13 +66,23 @@ int main()
             client_address);
 
             if (client_socket_fd < 0){
-                
+                if (errno == EINTR)
+                {
+                    if (shutdown_requested)
+                        break;
+
+                    continue;
+                }
                 std::cerr << "Failed to accept client connection. Continuing...\n";
                 continue; // Continue to the next iteration to accept another connection
             }
 
-            thread_pool.enqueue_client(client_socket_fd);
+            if(!thread_pool.enqueue_client(client_socket_fd)){
+                std::cerr << "Failed to enqueue client. Continuing...\n";
+                close(client_socket_fd);
+            }
         }
-    close(socket_fd);
-    return 0;
+        thread_pool.shutdown();
+        close(socket_fd);
+        return 0;
 }

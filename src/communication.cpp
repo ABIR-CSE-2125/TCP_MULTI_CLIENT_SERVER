@@ -9,6 +9,7 @@
 #include <arpa/inet.h>
 #include <sys/types.h>
 #include <vector>
+#include <cerrno>
 
 int create_socket()
 {
@@ -88,6 +89,10 @@ int accept_client(int server_socket_fd, sockaddr_in &client_address)
 
     if (client_socket_fd < 0)
     {
+        if (errno == EINTR)
+        {
+            return -1;
+        }
         perror("Accept failed");
         return -1;
     }

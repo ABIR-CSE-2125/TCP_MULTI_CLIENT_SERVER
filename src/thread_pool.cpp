@@ -33,17 +33,22 @@ ThreadPool::ThreadPool(std::size_t num_threads, const ServerConfig &config_param
     }
 }
 
-void ThreadPool::enqueue_client(int client_socket_fd)
+bool ThreadPool::enqueue_client(int client_socket_fd)
 {
     {
         std::lock_guard<std::mutex> lock(queue_mutex);
+        if(stopping)
+        {
+            return false; // Indicate failure to enqueue
+        }
         client_queue.push(client_socket_fd);
     }
 
     condition.notify_one();
+    return true; // Indicate success
 }
 
-ThreadPool::~ThreadPool()
+void ThreadPool::shutdown()
 {
     {
         std::lock_guard<std::mutex> lock(queue_mutex);
@@ -58,4 +63,9 @@ ThreadPool::~ThreadPool()
             worker.join();
         }
     }
+}
+
+ThreadPool::~ThreadPool()
+{
+    shutdown();
 }
