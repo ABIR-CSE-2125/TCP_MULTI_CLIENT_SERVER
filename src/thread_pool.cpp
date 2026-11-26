@@ -5,6 +5,7 @@
 #include <string>
 #include <iostream>
 #include <sys/socket.h>
+#include <cstring>
 
 void ::ThreadPool::worker_job()
 {
@@ -24,11 +25,10 @@ void ::ThreadPool::worker_job()
         active_clients.insert(client_socket_fd);
         lock.unlock();                           // Unlock the mutex before processing the client
         handle_client(client_socket_fd, config); // Pass the config to handle_client
-        std::cout << "Debug: Finished handling client: " << client_socket_fd << "\n";
+        // std::cout << "Debug: Finished handling client: " << client_socket_fd << "\n";
         lock.lock();
-        std::cout << "Debug: Removing client From ACtive Queue: " << client_socket_fd << "\n";
+        // std::cout << "Debug: Removing client From ACtive Queue: " << client_socket_fd << "\n";
         active_clients.erase(client_socket_fd);
-        std::cout << "Debug: Closing client From ACtive Queue: " << client_socket_fd << "\n";
         close(client_socket_fd);
         lock.unlock();
     }

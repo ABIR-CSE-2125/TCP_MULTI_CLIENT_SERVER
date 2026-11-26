@@ -156,9 +156,9 @@ void handle_client(int client_socket_fd, const ServerConfig &config)
         }
         else if (bytes_received == 0)
         {
-            std::cout << "Client disconnected\n";
-            std::cout << "DEBUG: handle_client returning for FD: "
-                      << client_socket_fd << std::endl;
+            std::cout << "Connection Closed\n";
+            // std::cout << "DEBUG: handle_client returning for FD: "
+                    //   << client_socket_fd << std::endl;
             break;
         }
         std::cout << "Received: " << bytes_received << " bytes\n"
