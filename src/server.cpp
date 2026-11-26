@@ -56,7 +56,7 @@ int main()
     sigaction(SIGINT, &sa, nullptr);
     sigaction(SIGTERM, &sa, nullptr);
 
-    ThreadPool thread_pool(3, config);
+    ThreadPool thread_pool(config.num_thread, config);
 
     while (!shutdown_requested) //  For  keep Searching for connections
     {
