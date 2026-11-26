@@ -1,5 +1,7 @@
 #include "thread_pool.hpp"
 #include "communication.hpp"
+#include "unique_socket.hpp"
+
 #include <stdexcept>
 #include <unistd.h>
 #include <string>
@@ -20,16 +22,22 @@ void ::ThreadPool::worker_job()
         {
             return; // Exit the thread if stopping and no clients are left
         }
-        int client_socket_fd = client_queue.front();
+        UniqueSocket client_socket = std::move(client_queue.front());
         client_queue.pop();
-        active_clients.insert(client_socket_fd);
-        lock.unlock();                           // Unlock the mutex before processing the client
-        handle_client(client_socket_fd, config); // Pass the config to handle_client
+        active_clients.insert(client_socket.get()); // Add the client socket to the active clients set
+        lock.unlock();                              // Unlock the mutex before processing the client
+        try
+        {
+            handle_client(client_socket.get(), config);
+        }
+        catch (const std::exception &e)
+        {
+            std::cerr << "Client handling failed: " << e.what() << '\n';
+        }
         // std::cout << "Debug: Finished handling client: " << client_socket_fd << "\n";
         lock.lock();
         // std::cout << "Debug: Removing client From ACtive Queue: " << client_socket_fd << "\n";
-        active_clients.erase(client_socket_fd);
-        close(client_socket_fd);
+        active_clients.erase(client_socket.get());
         lock.unlock();
     }
 }
@@ -47,7 +55,7 @@ ThreadPool::ThreadPool(std::size_t num_threads, const ServerConfig &config_param
     }
 }
 
-bool ThreadPool::enqueue_client(int client_socket_fd)
+bool ThreadPool::enqueue_client(UniqueSocket client_socket)
 {
     {
         std::lock_guard<std::mutex> lock(queue_mutex);
@@ -55,7 +63,7 @@ bool ThreadPool::enqueue_client(int client_socket_fd)
         {
             return false; // Indicate failure to enqueue
         }
-        client_queue.push(client_socket_fd);
+        client_queue.push(std::move(client_socket));
     }
 
     condition.notify_one();
@@ -71,11 +79,11 @@ void ThreadPool::shutdown()
         const std::string shutdown_message_q = "SERVER_SHUTDOWN QUEUED\n";
         while (!client_queue.empty())
         {
-            int client_socket_fd = client_queue.front();
+            UniqueSocket client_socket = std::move(client_queue.front());
             client_queue.pop();
-            send_all(client_socket_fd, shutdown_message_q.c_str(),
+            send_all(client_socket.get(), shutdown_message_q.c_str(),
                      shutdown_message_q.size());
-            close(client_socket_fd); // Close the client socket
+            close(client_socket.get()); // Close the client socket
         }
         // Notify all active clients before interrupting them
         const std::string shutdown_message_a = "SERVER_SHUTDOWN ACTIVE\n";

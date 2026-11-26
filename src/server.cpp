@@ -1,6 +1,7 @@
 #include "communication.hpp"
 #include "config.hpp"
 #include "thread_pool.hpp"
+#include "unique_socket.hpp"
 //=======================================================
 #include <netinet/in.h>
 #include <iostream>
@@ -8,10 +9,11 @@
 #include <csignal>
 #include <cerrno>
 #include <signal.h>
+#include <utility>
 
 volatile std::sig_atomic_t shutdown_requested = 0;
 
-void handle_shutdown_signal(int signal)
+void handle_shutdown_signal(int)
 {
     shutdown_requested = 1;
 }
@@ -64,25 +66,27 @@ int main()
         int client_socket_fd = accept_client(
             socket_fd,
             client_address);
+        // Shutdown requested check
+        if (client_socket_fd < 0)
+        {
+            if (errno == EINTR)
+            {
+                if (shutdown_requested)
+                    break;
 
-            if (client_socket_fd < 0){
-                if (errno == EINTR)
-                {
-                    if (shutdown_requested)
-                        break;
-
-                    continue;
-                }
-                std::cerr << "Failed to accept client connection. Continuing...\n";
-                continue; // Continue to the next iteration to accept another connection
+                continue;
             }
-
-            if(!thread_pool.enqueue_client(client_socket_fd)){
-                std::cerr << "Failed to enqueue client. Continuing...\n";
-                close(client_socket_fd);
-            }
+            std::cerr << "Failed to accept client connection. Continuing...\n";
+            continue; // Continue to the next iteration to accept another connection
         }
-        thread_pool.shutdown();
-        close(socket_fd);
-        return 0;
+
+        UniqueSocket client_socket(client_socket_fd);
+        if (!thread_pool.enqueue_client(std::move(client_socket)))
+        {
+            std::cerr << "Failed to enqueue client. Continuing...\n";
+        }
+    }
+    thread_pool.shutdown();
+    close(socket_fd);
+    return 0;
 }
