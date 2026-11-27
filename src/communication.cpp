@@ -219,7 +219,7 @@ void handle_client(int client_socket_fd, const ServerConfig &config, Logger &log
         }
         std::ostringstream oss;
         oss << "Received: " << bytes_received << " bytes";
-        logger.log(LogLevel::INFO, owner, oss.str());
+        logger.log(LogLevel::DEBUG, owner, oss.str());
 
         // std::cout.write(buffer.data(), bytes_received);
         // std::cout << '\n';
@@ -234,6 +234,6 @@ void handle_client(int client_socket_fd, const ServerConfig &config, Logger &log
         }
 
         // std::cout << "Echo sent successfully\n";
-        logger.log(LogLevel::INFO, owner, "Echo sent successfully");
+        logger.log(LogLevel::DEBUG, owner, "Echo sent successfully");
     }
 }
