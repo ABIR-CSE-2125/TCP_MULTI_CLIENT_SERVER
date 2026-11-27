@@ -97,7 +97,8 @@ bool load_config(const std::string &file_path, ServerConfig &config)
         "SERVER_IP",
         "SERVER_PORT",
         "LISTEN_BACKLOG",
-        "BUFFER_SIZE"};
+        "BUFFER_SIZE",
+        "NUM_THREAD"};
 
     for (const auto &key : required_keys)
     {
@@ -143,10 +144,12 @@ bool load_config(const std::string &file_path, ServerConfig &config)
     int port;
     int backlog;
     int buffer_size;
+    int num_thread;
 
     if (!parse_integer(values["SERVER_PORT"], port) ||
         !parse_integer(values["LISTEN_BACKLOG"], backlog) ||
-        !parse_integer(values["BUFFER_SIZE"], buffer_size))
+        !parse_integer(values["BUFFER_SIZE"], buffer_size) ||
+        !parse_integer(values["NUM_THREAD"], num_thread))
     {
         std::cerr << "Invalid integer configuration value\n";
         return false;
@@ -170,12 +173,19 @@ bool load_config(const std::string &file_path, ServerConfig &config)
         std::cerr << "BUFFER_SIZE must be positive\n";
         return false;
     }
+    if (num_thread < 1)
+    {
+        std::cerr << "NUM_THREAD must be positive\n";
+        return false;
+    }
+    
 
     // Populate the configuration structure
     config.server_ip = values["SERVER_IP"];
     config.server_port = port;
     config.listen_backlog = backlog;
     config.buffer_size = buffer_size;
+    config.num_thread = num_thread;
 
     return true;
 }

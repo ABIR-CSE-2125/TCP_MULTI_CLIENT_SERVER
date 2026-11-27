@@ -9,6 +9,7 @@ struct ServerConfig
     int server_port;
     int listen_backlog;
     int buffer_size;
+    int num_thread;
 };
 
 bool load_config(const std::string &file_path, ServerConfig &config);

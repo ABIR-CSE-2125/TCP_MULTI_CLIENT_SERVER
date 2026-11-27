@@ -1,15 +1,22 @@
 #include "communication.hpp"
 #include "config.hpp"
+#include "thread_pool.hpp"
+#include "unique_socket.hpp"
 //=======================================================
 #include <netinet/in.h>
 #include <iostream>
 #include <unistd.h>
-#include <arpa/inet.h>
-//=======================================================
-#include <thread>
-#include <functional>
-#include <system_error>
-#include <exception>
+#include <csignal>
+#include <cerrno>
+#include <signal.h>
+#include <utility>
+
+volatile std::sig_atomic_t shutdown_requested = 0;
+
+void handle_shutdown_signal(int)
+{
+    shutdown_requested = 1;
+}
 
 int main()
 {
@@ -41,7 +48,17 @@ int main()
         return 1;
     }
 
-    while (true) //  For  keep Searching for connections
+    struct sigaction sa{};
+    sa.sa_handler = handle_shutdown_signal;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
+
+    sigaction(SIGINT, &sa, nullptr);
+    sigaction(SIGTERM, &sa, nullptr);
+
+    ThreadPool thread_pool(config.num_thread, config);
+
+    while (!shutdown_requested) //  For  keep Searching for connections
     {
         // Accepting a connection (optional, for demonstration purposes)
         sockaddr_in client_address{};
@@ -49,43 +66,27 @@ int main()
         int client_socket_fd = accept_client(
             socket_fd,
             client_address);
-
-            if (client_socket_fd < 0){
-                
-                std::cerr << "Failed to accept client connection. Continuing...\n";
-                continue; // Continue to the next iteration to accept another connection
-            }
-
-        // Handle the client in a separate thread
-            try
+        // Shutdown requested check
+        if (client_socket_fd < 0)
+        {
+            if (errno == EINTR)
             {
-                std::thread client_thread(
-                    handle_client,
-                    client_socket_fd,
-                    std::cref(config));
+                if (shutdown_requested)
+                    break;
 
-                try
-                {
-                    client_thread.detach();
-                }
-                catch (const std::system_error &e)
-                {
-                    std::cerr << "Thread detach failed: "
-                              << e.what() << '\n';
+                continue;
+            }
+            std::cerr << "Failed to accept client connection. Continuing...\n";
+            continue; // Continue to the next iteration to accept another connection
+        }
 
-                    if (client_thread.joinable())
-                    {
-                        client_thread.join();
-                    }
-                }
-            }
-            catch (const std::system_error &e)
-            {
-                std::cerr << "Thread creation failed: "
-                          << e.what() << '\n';
-                close(client_socket_fd);
-            }
+        UniqueSocket client_socket(client_socket_fd);
+        if (!thread_pool.enqueue_client(std::move(client_socket)))
+        {
+            std::cerr << "Failed to enqueue client. Continuing...\n";
+        }
     }
+    thread_pool.shutdown();
     close(socket_fd);
     return 0;
 }
