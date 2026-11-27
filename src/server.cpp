@@ -2,6 +2,7 @@
 #include "config.hpp"
 #include "thread_pool.hpp"
 #include "unique_socket.hpp"
+#include "logger.hpp"
 //=======================================================
 #include <netinet/in.h>
 #include <iostream>
@@ -11,6 +12,7 @@
 #include <signal.h>
 #include <utility>
 
+constexpr const char *OWNER = "SERVER" ;
 volatile std::sig_atomic_t shutdown_requested = 0;
 
 void handle_shutdown_signal(int)
@@ -29,25 +31,24 @@ int main()
         return 1;
     }
 
-    int socket_fd = create_socket();
+    Logger logger(config.log_level);
 
+    int socket_fd = create_socket(logger, OWNER);
     if (socket_fd < 0)
         return 1;
 
     // BIND SOCKET
-    if (!bind_socket(socket_fd, config.server_ip, config.server_port))
+    if (!bind_socket(socket_fd, config.server_ip, config.server_port, logger, OWNER))
     {
         close(socket_fd);
         return 1;
     }
-
     // START LISTENING
-    if (!start_listening(socket_fd, config.listen_backlog))
+    if (!start_listening(socket_fd, config.listen_backlog,logger,OWNER))
     {
         close(socket_fd);
         return 1;
     }
-
     struct sigaction sa{};
     sa.sa_handler = handle_shutdown_signal;
     sigemptyset(&sa.sa_mask);
@@ -56,7 +57,7 @@ int main()
     sigaction(SIGINT, &sa, nullptr);
     sigaction(SIGTERM, &sa, nullptr);
 
-    ThreadPool thread_pool(config.num_thread, config);
+    ThreadPool thread_pool(config.num_thread, config, logger);
 
     while (!shutdown_requested) //  For  keep Searching for connections
     {
@@ -65,7 +66,7 @@ int main()
 
         int client_socket_fd = accept_client(
             socket_fd,
-            client_address);
+            client_address, logger, OWNER);
         // Shutdown requested check
         if (client_socket_fd < 0)
         {
@@ -86,7 +87,7 @@ int main()
             std::cerr << "Failed to enqueue client. Continuing...\n";
         }
     }
-    thread_pool.shutdown();
+    // thread_pool.shutdown();
     close(socket_fd);
     return 0;
 }

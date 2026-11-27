@@ -1,6 +1,7 @@
 #include "thread_pool.hpp"
 #include "communication.hpp"
 #include "unique_socket.hpp"
+#include "logger.hpp"
 
 #include <stdexcept>
 #include <string>
@@ -9,6 +10,8 @@
 #include <cstring>
 #include <mutex>
 #include "active_client_guard.hpp"
+
+constexpr const char *OWNER = "THREAD_POOL";
 
 void ::ThreadPool::worker_job()
 {
@@ -36,11 +39,13 @@ void ::ThreadPool::worker_job()
             }
             catch (const std::exception &e)
             {
-                std::cerr << "Active Client Insertion Failed: " << e.what() << '\n';
+                // std::cerr << "Active Client Insertion Failed: " << e.what() << '\n';
+                logger.log(LogLevel::ERROR, OWNER, std::string("Active Client Insertion Failed: ") + e.what());
             }
             catch (...)
             {
-                std::cerr << "Active Client Insertion Failed: Unknown error\n";
+                // std::cerr << "Active Client Insertion Failed: Unknown error\n";
+                logger.log(LogLevel::ERROR, OWNER, "Active Client Insertion Failed: Unknown error");
             }
 
             if (!client_registered)
@@ -54,15 +59,17 @@ void ::ThreadPool::worker_job()
             // Handle the client connection
             try
             {
-                handle_client(client_socket.get(), config);
+                handle_client(client_socket.get(), config, logger, OWNER);
             }
             catch (const std::exception &e)
             {
-                std::cerr << "Client handling failed: " << e.what() << '\n';
+                // std::cerr << "Client handling failed: " << e.what() << '\n';
+                logger.log(LogLevel::ERROR, OWNER, std::string("Client handling failed: ") + e.what());
             }
             catch (...)
             {
-                std::cerr << "Client handling failed: Unknown error\n";
+                // std::cerr << "Client handling failed: Unknown error\n";
+                logger.log(LogLevel::ERROR, OWNER, "Client handling failed: Unknown error");
             }
         }
         catch (const std::exception &e)
@@ -72,13 +79,14 @@ void ::ThreadPool::worker_job()
         }
         catch (...)
         {
-            std::cerr << "Unknown error occurred in worker thread\n";
+            // std::cerr << "Unknown error occurred in worker thread\n";
+            logger.log(LogLevel::ERROR, OWNER, "Unknown error occurred in worker thread");
             return;
         }
     }
 }
 
-ThreadPool::ThreadPool(std::size_t num_threads, const ServerConfig &config_param) : config(config_param)
+ThreadPool::ThreadPool(std::size_t num_threads, const ServerConfig &config_param, Logger &logger_param) : config(config_param), logger(logger_param)
 {
     if (num_threads < 1)
     {
@@ -130,18 +138,27 @@ void ThreadPool::shutdown()
     {
         std::lock_guard<std::mutex> lock(queue_mutex);
         stopping = true;
+        logger.log(LogLevel::INFO, OWNER,
+                   "Shutdown initiated");
         // Close all Queued client sockets
+        logger.log(LogLevel::INFO, OWNER, "Cleaning Up " + std::to_string(client_queue.size()) + " Pending Clients");
         while (!client_queue.empty())
         {
             client_queue.pop(); // Clear the queue, which will close the sockets due to UniqueSocket's destructor
         }
+        logger.log(LogLevel::INFO, OWNER,"Pending Client Cleanup Completed");
         // Notify all active clients before interrupting them
+        logger.log(LogLevel::INFO, OWNER, "Cleaning Up " + std::to_string(active_clients.size()) + " Active Client  Cleanup Start");
         for (int client_socket_fd : active_clients)
         {
             ::shutdown(client_socket_fd, SHUT_RDWR);
+            logger.log(LogLevel::INFO, OWNER,
+                       "Active client shutdown signals sent");
         }
     }
     condition.notify_all();
+    logger.log(LogLevel::INFO, OWNER,
+               "Waiting for worker threads to terminate");
 
     for (std::thread &worker : workers)
     {
@@ -150,6 +167,8 @@ void ThreadPool::shutdown()
             worker.join();
         }
     }
+    logger.log(LogLevel::INFO, OWNER,
+               "All worker threads terminated. Shutdown successful");
 }
 
 ThreadPool::~ThreadPool()

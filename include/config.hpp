@@ -1,8 +1,7 @@
 #ifndef CONFIG_HPP
 #define CONFIG_HPP
-
+#include "logger.hpp"
 #include <string>
-
 struct ServerConfig
 {
     std::string server_ip;
@@ -10,6 +9,7 @@ struct ServerConfig
     int listen_backlog;
     int buffer_size;
     int num_thread;
+    LogLevel log_level;
 };
 
 bool load_config(const std::string &file_path, ServerConfig &config);

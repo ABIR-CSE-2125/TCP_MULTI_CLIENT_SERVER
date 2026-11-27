@@ -1,6 +1,7 @@
 
 #include "config.hpp"
-
+#include "logger.hpp"
+//===============================================
 #include <arpa/inet.h>
 #include <cctype>
 #include <fstream>
@@ -8,32 +9,52 @@
 #include <map>
 #include <string>
 
-// Remove leading and trailing whitespace
-static std::string trim(const std::string &str)
+namespace
 {
-    std::size_t start = str.find_first_not_of(" \t\r\n");
-
-    if (start == std::string::npos)
-        return "";
-
-    std::size_t end = str.find_last_not_of(" \t\r\n");
-
-    return str.substr(start, end - start + 1);
-}
-
-// Convert a string to an integer strictly
-static bool parse_integer(const std::string &value, int &result)
-{
-    try
+    // Remove leading and trailing whitespace
+    std::string trim(const std::string &str)
     {
-        std::size_t processed = 0;
-        result = std::stoi(value, &processed);
+        std::size_t start = str.find_first_not_of(" \t\r\n");
 
-        return processed == value.length();
+        if (start == std::string::npos)
+            return "";
+
+        std::size_t end = str.find_last_not_of(" \t\r\n");
+
+        return str.substr(start, end - start + 1);
     }
-    catch (const std::exception &)
+
+    // Convert a string to an integer strictly
+    bool parse_integer(const std::string &value, int &result)
     {
-        return false;
+        try
+        {
+            std::size_t processed = 0;
+            result = std::stoi(value, &processed);
+
+            return processed == value.length();
+        }
+        catch (const std::exception &)
+        {
+            return false;
+        }
+    }
+
+    LogLevel string_to_log_level(const std::string &level)
+    {
+        if (level == "DEBUG")
+            return LogLevel::DEBUG;
+
+        if (level == "INFO")
+            return LogLevel::INFO;
+
+        if (level == "WARN")
+            return LogLevel::WARN;
+
+        if (level == "ERROR")
+            return LogLevel::ERROR;
+
+        throw std::invalid_argument("Invalid LOG_LEVEL: " + level);
     }
 }
 
@@ -98,7 +119,8 @@ bool load_config(const std::string &file_path, ServerConfig &config)
         "SERVER_PORT",
         "LISTEN_BACKLOG",
         "BUFFER_SIZE",
-        "NUM_THREAD"};
+        "NUM_THREAD",
+        "LOG_LEVEL"};
 
     for (const auto &key : required_keys)
     {
@@ -140,13 +162,12 @@ bool load_config(const std::string &file_path, ServerConfig &config)
         std::cerr << "Invalid SERVER_IP\n";
         return false;
     }
-
     int port;
     int backlog;
     int buffer_size;
     int num_thread;
-
-    if (!parse_integer(values["SERVER_PORT"], port) ||
+    if (
+        !parse_integer(values["SERVER_PORT"], port) ||
         !parse_integer(values["LISTEN_BACKLOG"], backlog) ||
         !parse_integer(values["BUFFER_SIZE"], buffer_size) ||
         !parse_integer(values["NUM_THREAD"], num_thread))
@@ -178,7 +199,6 @@ bool load_config(const std::string &file_path, ServerConfig &config)
         std::cerr << "NUM_THREAD must be positive\n";
         return false;
     }
-    
 
     // Populate the configuration structure
     config.server_ip = values["SERVER_IP"];
@@ -186,6 +206,17 @@ bool load_config(const std::string &file_path, ServerConfig &config)
     config.listen_backlog = backlog;
     config.buffer_size = buffer_size;
     config.num_thread = num_thread;
+    LogLevel log_level;
+    try
+    {
+        log_level = string_to_log_level(values["LOG_LEVEL"]);
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << e.what() << '\n';
+        return false;
+    }
+    config.log_level = log_level;
 
     return true;
 }
